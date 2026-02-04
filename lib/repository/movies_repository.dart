@@ -27,7 +27,6 @@ class MoviesRepository {
 
   Uri _buildUri(String path, [Map<String, String>? query]) {
     final q = Map<String, String>.from(query ?? {});
-    // Always use API Key if token is missing, or as fallback
     if (_apiToken.isEmpty && _apiKey.isNotEmpty) {
       q['api_key'] = _apiKey;
     }
