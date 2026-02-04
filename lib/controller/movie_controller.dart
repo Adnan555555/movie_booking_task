@@ -10,7 +10,6 @@ class MoviesController extends GetxController {
 
   MoviesController(this.repository);
 
-  // Observable state variables
   final Rx<MoviesStatus> status = MoviesStatus.initial.obs;
   final RxList<Movie> upcoming = <Movie>[].obs;
   final RxList<Movie> popular = <Movie>[].obs;

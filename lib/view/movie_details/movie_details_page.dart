@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:movie_booking_app/widgets/movie_card_shimmer.dart';
+import 'package:movie_booking_app/widgets/simmer_effect.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 import '../../controller/movie_controller.dart';
