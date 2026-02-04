@@ -31,12 +31,7 @@ class MoviesRepository {
     if (_apiToken.isEmpty && _apiKey.isNotEmpty) {
       q['api_key'] = _apiKey;
     }
-    // Note: TMDb V3 works with api_key query param even if using Bearer, but Bearer is preferred.
-    // If we have no token, we MUST use api_key.
-    // The previous logic was: if _apiKey is not empty, add it.
-    // Let's stick to adding it if available, as it doesn't hurt usually,
-    // but typically one auth method is enough.
-    // However, to be safe and ensure the user's key works:
+
     if (_apiKey.isNotEmpty) q['api_key'] = _apiKey;
 
     return Uri.parse('$_baseUrl$path').replace(queryParameters: q);
@@ -167,7 +162,6 @@ class MoviesRepository {
     }
   }
 
-  // Legacy methods for backward compatibility
   List<Movie> upcoming() {
     return [];
   }
