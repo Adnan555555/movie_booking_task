@@ -15,6 +15,7 @@ class MoviesRepository {
     defaultValue: '',
   );
   static const String _baseUrl = 'https://api.themoviedb.org/3';
+  // static const String _baseUrl = 'https://www.themoviedb.org/movie';
   static const String _imageW500 = 'https://image.tmdb.org/t/p/w500';
   static const String _imageW1280 = 'https://image.tmdb.org/t/p/w1280';
 
@@ -36,7 +37,7 @@ class MoviesRepository {
     return Uri.parse('$_baseUrl$path').replace(queryParameters: q);
   }
 
-  Future<List<Movie>> getUpcomingMovies() async {
+  Future<List<Movie>> getUpcomingMovies({int page = 1}) async {
     try {
       final uri = _buildUri('/movie/upcoming');
       print('Calling API: $uri');

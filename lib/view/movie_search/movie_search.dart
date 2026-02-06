@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:pull_to_refresh/pull_to_refresh.dart';
 import 'package:movie_booking_app/widgets/simmer_effect.dart';
-
-import '../../controller/movie_controller.dart';
-import '../../core/app_route.dart';
-import '../../core/app_theme.dart';
-import '../../model/movie.dart';
+import 'package:movie_booking_app/controller/movie_controller.dart';
+import 'package:movie_booking_app/core/app_route.dart';
+import 'package:movie_booking_app/core/app_theme.dart';
+import 'package:movie_booking_app/model/movie.dart';
 
 class MovieSearchPage extends StatefulWidget {
   const MovieSearchPage({super.key});
@@ -18,12 +18,54 @@ class MovieSearchPage extends StatefulWidget {
 class _MovieSearchPageState extends State<MovieSearchPage> {
   final TextEditingController _searchController = TextEditingController();
   final MoviesController controller = Get.find<MoviesController>();
+  final RefreshController _refreshController = RefreshController(initialRefresh: false);
   String _currentQuery = '';
   bool _hasSearched = false;
+  int _currentPage = 1;
+  List<Movie> _displayMovies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
+    setState(() {
+      _displayMovies = List.from(controller.upcoming);
+    });
+  }
+
+  void _onRefresh() async {
+    _currentPage = 1;
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (_currentQuery.isEmpty) {
+      setState(() {
+        _displayMovies = List.from(controller.upcoming);
+      });
+    } else {
+      controller.searchMovies(_currentQuery);
+      await Future.delayed(const Duration(milliseconds: 300));
+      setState(() {
+        _displayMovies = List.from(controller.searchResults);
+      });
+    }
+    _refreshController.refreshCompleted();
+  }
+
+  void _onLoading() async {
+    _currentPage++;
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Mark as complete since all data is loaded at once
+    _refreshController.loadComplete();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _refreshController.dispose();
     super.dispose();
   }
 
@@ -32,15 +74,28 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
       setState(() {
         _currentQuery = '';
         _hasSearched = false;
+        _currentPage = 1;
+        _displayMovies = List.from(controller.upcoming);
       });
       controller.searchResults.clear();
       return;
     }
+
     setState(() {
       _currentQuery = query;
       _hasSearched = true;
+      _currentPage = 1;
     });
+
     controller.searchMovies(query);
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _displayMovies = List.from(controller.searchResults);
+        });
+      }
+    });
   }
 
   void _openDetail(Movie movie) {
@@ -70,13 +125,13 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                 height: 120,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
-                  width: 80,
+                  width: 130,
                   height: 120,
                   color: AppTheme.surface,
                   child: const Center(child: CustomShimmer()),
                 ),
                 errorWidget: (context, url, error) => Container(
-                  width: 80,
+                  width: 130,
                   height: 120,
                   color: AppTheme.surface,
                   child: const Icon(Icons.error, color: AppTheme.textSecondary),
@@ -98,7 +153,7 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    SizedBox(height: 5),
+                    const SizedBox(height: 5),
                     Text(
                       movie.releaseDate,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -117,8 +172,8 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                 ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(12),
+            const Padding(
+              padding: EdgeInsets.all(12),
               child: Icon(
                 Icons.more_horiz_outlined,
                 color: AppTheme.lightBlueColor,
@@ -131,58 +186,43 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
     );
   }
 
-  Widget _buildMovieGrid(List<Movie> movies) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 50),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: movies.length,
-      itemBuilder: (context, index) {
-        final movie = movies[index];
-        return GestureDetector(
-          onTap: () => _openDetail(movie),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CachedNetworkImage(
-                  imageUrl: movie.posterUrl,
-                  fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                    color: AppTheme.surface,
-                    child: const Center(child: CustomShimmer()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: AppTheme.surface,
-                    child: const Icon(Icons.error),
-                  ),
-                ),
-                Positioned(
-                  bottom: 30,
-                  left: 10,
-                  right: 0,
-                  child: Text(
-                    movie.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: AppTheme.white,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.left,
-                  ),
-                ),
-              ],
+  Widget _buildMovieGridItem(Movie movie) {
+    return GestureDetector(
+      onTap: () => _openDetail(movie),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: movie.posterUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: AppTheme.surface,
+                child: const Center(child: CustomShimmer()),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppTheme.surface,
+                child: const Icon(Icons.error),
+              ),
             ),
-          ),
-        );
-      },
+            Positioned(
+              bottom: 30,
+              left: 10,
+              right: 10,
+              child: Text(
+                movie.title,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.white,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.left,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -221,7 +261,7 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                         color: AppTheme.textSecondary,
                         fontSize: 16,
                       ),
-                      prefixIcon: Icon(
+                      prefixIcon: const Icon(
                         Icons.search,
                         color: AppTheme.textPrimary,
                         size: 24,
@@ -249,7 +289,6 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                       setState(() {
                         _searchController.clear();
                         _performSearch('');
-                        // Navigate back when clear is pressed
                         Get.back();
                       });
                     },
@@ -269,12 +308,13 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
       body: Padding(
         padding: const EdgeInsets.symmetric(vertical: 1),
         child: Obx(() {
+          if (controller.status.value == MoviesStatus.loading && _displayMovies.isEmpty) {
+            return const Center(child: CustomShimmer());
+          }
+
           if (_currentQuery.isEmpty && !_hasSearched) {
-            if (controller.status.value == MoviesStatus.loading &&
-                controller.upcoming.isEmpty) {
-              return const Center(child: CustomShimmer());
-            }
-            if (controller.upcoming.isEmpty) {
+            // Show grid view for browsing
+            if (_displayMovies.isEmpty) {
               return Center(
                 child: Text(
                   'No upcoming movies found',
@@ -284,41 +324,63 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                 ),
               );
             }
-            return SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _buildMovieGrid(controller.upcoming),
-            );
-          }
 
-          // Show loading state
-          if (controller.status.value == MoviesStatus.loading) {
-            return const Center(child: CustomShimmer());
-          }
-
-          // Show error state
-          if (controller.status.value == MoviesStatus.failure) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Failed to search movies'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () => _performSearch(_currentQuery),
-                    child: const Text('Retry'),
-                  ),
-                ],
+            return SmartRefresher(
+              controller: _refreshController,
+              enablePullDown: true,
+              enablePullUp: true,
+              onRefresh: _onRefresh,
+              onLoading: _onLoading,
+              header: WaterDropHeader(
+                complete: Text(
+                  'Refresh Completed',
+                  style: TextStyle(color: AppTheme.textSecondary),
+                ),
+                waterDropColor: AppTheme.primary,
+              ),
+              footer: CustomFooter(
+                builder: (BuildContext context, LoadStatus? mode) {
+                  Widget body;
+                  if (mode == LoadStatus.idle) {
+                    body = const Text("Pull up to load more");
+                  } else if (mode == LoadStatus.loading) {
+                    body = const CircularProgressIndicator();
+                  } else if (mode == LoadStatus.failed) {
+                    body = const Text("Load Failed! Click retry!");
+                  } else if (mode == LoadStatus.canLoading) {
+                    body = const Text("Release to load more");
+                  } else {
+                    body = const Text("No more data");
+                  }
+                  return Container(
+                    height: 55.0,
+                    child: Center(child: body),
+                  );
+                },
+              ),
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 50),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: _displayMovies.length,
+                itemBuilder: (context, index) {
+                  return _buildMovieGridItem(_displayMovies[index]);
+                },
               ),
             );
           }
 
-          // Show "item not found" when search results are empty
-          if (_hasSearched && controller.searchResults.isEmpty) {
+          // Show search results
+          if (_hasSearched && _displayMovies.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.search_off,
                     size: 64,
                     color: AppTheme.textSecondary,
@@ -335,13 +397,43 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
             );
           }
 
-          // Show search results
-          if (controller.searchResults.isNotEmpty) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                children: [
-                  Padding(
+          return SmartRefresher(
+            controller: _refreshController,
+            enablePullDown: true,
+            enablePullUp: true,
+            onRefresh: _onRefresh,
+            onLoading: _onLoading,
+            header: WaterDropHeader(
+              complete: Text(
+                'Refresh Completed',
+                style: TextStyle(color: AppTheme.textSecondary),
+              ),
+              waterDropColor: AppTheme.primary,
+            ),
+            footer: CustomFooter(
+              builder: (BuildContext context, LoadStatus? mode) {
+                Widget body;
+                if (mode == LoadStatus.idle) {
+                  body = const Text("Pull up to load more");
+                } else if (mode == LoadStatus.loading) {
+                  body = const CircularProgressIndicator();
+                } else if (mode == LoadStatus.failed) {
+                  body = const Text("Load Failed! Click retry!");
+                } else if (mode == LoadStatus.canLoading) {
+                  body = const Text("Release to load more");
+                } else {
+                  body = const Text("No more data");
+                }
+                return Container(
+                  height: 55.0,
+                  child: Center(child: body),
+                );
+              },
+            ),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -354,7 +446,7 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                               ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         Text(
-                          '${controller.searchResults.length} Results Found',
+                          '${_displayMovies.length} Results Found',
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
@@ -363,20 +455,18 @@ class _MovieSearchPageState extends State<MovieSearchPage> {
                       ],
                     ),
                   ),
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: controller.searchResults.length,
-                    itemBuilder: (context, index) {
-                      return _buildMovieCard(controller.searchResults[index]);
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                      return _buildMovieCard(_displayMovies[index]);
                     },
+                    childCount: _displayMovies.length,
                   ),
-                ],
-              ),
-            );
-          }
-
-          return const SizedBox.shrink();
+                ),
+              ],
+            ),
+          );
         }),
       ),
     );

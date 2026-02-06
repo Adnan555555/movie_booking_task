@@ -6,9 +6,11 @@ import '../view/home/home_page.dart';
 import '../view/movie_details/movie_details_page.dart';
 import '../view/movie_search/movie_search.dart';
 import '../view/seat_selection/seat_selection.dart';
+import '../view/splash/splash_screen.dart';
 
 class AppRouter {
-  static const String home = '/';
+  static const String splash = '/';
+  static const String home = '/home';
   static const String detail = '/detail';
   static const String search = '/search';
   static const String dateSelection = '/date-selection';
@@ -16,18 +18,25 @@ class AppRouter {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+
       case home:
         return MaterialPageRoute(builder: (_) => const HomePage());
+
       case detail:
         final movie = settings.arguments as Movie;
         return MaterialPageRoute(builder: (_) => MovieDetailPage(movie: movie));
+
       case search:
         return MaterialPageRoute(builder: (_) => const MovieSearchPage());
+
       case dateSelection:
         final movie = settings.arguments as Movie;
         return MaterialPageRoute(
           builder: (_) => DateSelectionPage(movie: movie),
         );
+
       case seatSelection:
         final args = settings.arguments;
         if (args is Movie) {
@@ -56,8 +65,9 @@ class AppRouter {
         } else {
           return MaterialPageRoute(builder: (_) => const HomePage());
         }
+
       default:
-        return MaterialPageRoute(builder: (_) => const HomePage());
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
     }
   }
 }
